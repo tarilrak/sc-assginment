@@ -1,51 +1,37 @@
-// transactionService.js
+// userService.js
 const express = require('express');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 const app = express();
 app.use(express.json());
 
 // MongoDB connection
 mongoose.connect('mongodb://localhost:27017/bankingApp', { useNewUrlParser: true, useUnifiedTopology: true });
 
-// Account schema
-const accountSchema = new mongoose.Schema({
+// User schema
+const userSchema = new mongoose.Schema({
     userId: String,
-    balance: Number,
+    password: String,
+    name: String,
 });
-const Account = mongoose.model('Account', accountSchema);
+const User = mongoose.model('User', userSchema);
 
-// Transaction schema
-const transactionSchema = new mongoose.Schema({
-    fromUserId: String,
-    toUserId: String,
-    amount: Number,
-    date: { type: Date, default: Date.now },
+// Endpoint to register a user
+app.post('/register', async (req, res) => {
+    const newUser = new User(req.body);
+    await newUser.save();
+    res.json({ message: 'User registered successfully' });
 });
-const Transaction = mongoose.model('Transaction', transactionSchema);
 
-// Endpoint to perform a transaction
-app.post('/transfer', async (req, res) => {
-    const { fromUserId, toUserId, amount } = req.body;
-
-    const fromAccount = await Account.findOne({ userId: fromUserId });
-    const toAccount = await Account.findOne({ userId: toUserId });
-
-    if (fromAccount && toAccount && fromAccount.balance >= amount) {
-        // Update balances
-        fromAccount.balance -= amount;
-        toAccount.balance += amount;
-        
-        await fromAccount.save();
-        await toAccount.save();
-
-        // Record transaction
-        const transaction = new Transaction({ fromUserId, toUserId, amount });
-        await transaction.save();
-
-        res.json({ status: 'Success', message: 'Transaction completed' });
+// Endpoint to login and generate JWT
+app.post('/login', async (req, res) => {
+    const user = await User.findOne({ userId: req.body.userId, password: req.body.password });
+    if (user) {
+        const token = jwt.sign({ userId: user.userId }, 'secretKey');
+        res.json({ token });
     } else {
-        res.status(400).json({ status: 'Failure', message: 'Insufficient funds or invalid accounts' });
+        res.status(401).json({ message: 'Invalid credentials' });
     }
 });
 
-app.listen(3003, () => console.log('Transaction Service running on port 3003'));
+app.listen(3001, () => console.log('User Service running on port 3001'));
